@@ -238,6 +238,14 @@
             font-size: 1.2rem;
             font-weight: bold;
             transition: all 0.2s;
+            cursor: pointer;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .btn-chord.active {
@@ -491,10 +499,15 @@
                 const btn = document.createElement('div');
                 btn.className = `btn-chord ${chord === activeChord ? 'active' : ''}`;
                 btn.textContent = chord;
-                btn.onclick = () => {
+                const changeChord = () => {
                     activeChord = chord;
                     document.querySelectorAll('.btn-chord').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
+                };
+                btn.onclick = changeChord;
+                btn.ontouchstart = (e) => {
+                    e.preventDefault();
+                    changeChord();
                 };
                 playGrid.appendChild(btn);
             });
@@ -558,19 +571,42 @@
         const area = document.getElementById('strum-area');
         let lastId = null;
         const handleMove = (e) => {
-            const touch = e.touches ? e.touches[0] : e;
-            const el = document.elementFromPoint(touch.clientX, touch.clientY);
-            const container = el?.closest('.string-container');
-            if (container) {
-                const id = container.dataset.string;
-                if (id !== lastId) { trigger(container, id); lastId = id; }
-            } else { lastId = null; }
+            // Xử lý multi-touch: kiểm tra tất cả touches
+            for (let i = 0; i < (e.touches ? e.touches.length : 1); i++) {
+                const touch = e.touches ? e.touches[i] : e;
+                const el = document.elementFromPoint(touch.clientX, touch.clientY);
+                const container = el?.closest('.string-container');
+                if (container) {
+                    const id = container.dataset.string;
+                    if (id !== lastId) {
+                        trigger(container, id);
+                        lastId = id;
+                    }
+                }
+            }
         };
 
         area.onmousedown = (e) => { area.onmousemove = handleMove; handleMove(e); };
         window.onmouseup = () => area.onmousemove = null;
-        area.ontouchstart = (e) => handleMove(e);
-        area.ontouchmove = (e) => { e.preventDefault(); handleMove(e); };
+        area.ontouchstart = (e) => {
+            // Chỉ prevent default nếu touch trên string, không thì cho phép touch events khác
+            const touch = e.touches[0];
+            const el = document.elementFromPoint(touch.clientX, touch.clientY);
+            const isOnString = el?.closest('.string-container');
+            if (isOnString) {
+                e.preventDefault();
+            }
+            handleMove(e);
+        };
+        area.ontouchmove = (e) => {
+            const touch = e.touches[0];
+            const el = document.elementFromPoint(touch.clientX, touch.clientY);
+            const isOnString = el?.closest('.string-container');
+            if (isOnString) {
+                e.preventDefault();
+            }
+            handleMove(e);
+        };
         area.ontouchend = () => lastId = null;
 
         init();
