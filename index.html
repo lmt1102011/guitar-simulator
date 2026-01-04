@@ -18,6 +18,7 @@
             box-sizing: border-box;
             user-select: none;
             -webkit-user-select: none;
+            touch-action: none;
         }
 
         body, html {
@@ -29,31 +30,13 @@
             overflow: hidden;
         }
 
-        /* --- NÚT FULLSCREEN NHANH --- */
-        #fs-toggle {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            z-index: 6000;
-            background: rgba(0,0,0,0.6);
-            border: 1px solid var(--accent-color);
-            color: var(--accent-color);
-            padding: 8px 12px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 0.8rem;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        /* --- LỚP PHỦ CẢNH BÁO --- */
+        /* --- CẢNH BÁO XOAY & FULLSCREEN --- */
         #orientation-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.95);
             z-index: 9999;
-            display: flex;
+            display: none;
             flex-direction: column;
             justify-content: center;
             align-items: center;
@@ -114,12 +97,10 @@
             gap: 10px;
         }
 
-        /* QUAN TRỌNG: Cho phép cuộn bằng touch ở vùng này */
         .chord-scroll-area {
             flex: 1;
             overflow-y: auto;
             padding-right: 10px;
-            touch-action: pan-y; /* Cho phép cuộn dọc trên đth */
         }
 
         .chord-group {
@@ -137,7 +118,7 @@
 
         .chord-selection-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+            grid-template-columns: repeat(8, 1fr);
             gap: 8px;
         }
 
@@ -191,7 +172,6 @@
             justify-content: space-evenly;
             overflow: hidden;
             box-shadow: inset -20px 0 60px rgba(0,0,0,0.7);
-            touch-action: none; /* Vùng gảy đàn thì không cho cuộn trang */
         }
 
         #sound-hole-container {
@@ -226,7 +206,6 @@
             grid-template-columns: repeat(2, 1fr);
             gap: 10px;
             overflow-y: auto;
-            touch-action: pan-y; /* Cho phép cuộn danh sách hợp âm khi đang chơi */
         }
 
         .btn-chord {
@@ -299,14 +278,10 @@
 </head>
 <body>
 
-    <button id="fs-toggle" onclick="toggleFullScreen()">
-        <span id="fs-icon">⛶</span> Toàn màn hình
-    </button>
-
     <div id="orientation-overlay">
-        <h2>🎸 Chào mừng bạn!</h2>
-        <p>Để có trải nghiệm âm thanh tốt nhất và không bị rè, hãy xoay ngang điện thoại và bật toàn màn hình.</p>
-        <button class="btn-fullscreen" onclick="requestFullScreenAndLandscape()">VÀO CHƠI NGAY</button>
+        <h2>🎸 Trải Nghiệm Tốt Nhất</h2>
+        <p>Vui lòng xoay ngang màn hình và bật chế độ toàn màn hình để âm thanh không bị rè.</p>
+        <button class="btn-fullscreen" onclick="requestFullScreenAndLandscape()">BẮT ĐẦU NGAY</button>
     </div>
 
     <div id="setup-screen">
@@ -321,22 +296,22 @@
         </div>
         
         <div class="setup-column chord-col">
-            <h2>Chọn Hợp Âm</h2>
+            <h2>Hợp Âm Biến Thể</h2>
             <div class="chord-scroll-area">
                 <div class="chord-group">
-                    <h3>Trưởng & Thứ</h3>
+                    <h3>Trưởng & Thứ (Major / Minor)</h3>
                     <div class="chord-selection-grid" id="grid-main"></div>
                 </div>
                 <div class="chord-group">
-                    <h3>Hợp âm 7</h3>
+                    <h3>Hợp âm 7 (Dominant / Major 7)</h3>
                     <div class="chord-selection-grid" id="grid-7th"></div>
                 </div>
                 <div class="chord-group">
-                    <h3>Treo (sus)</h3>
+                    <h3>Treo (sus2 / sus4)</h3>
                     <div class="chord-selection-grid" id="grid-sus"></div>
                 </div>
                 <div class="chord-group">
-                    <h3>Mở rộng</h3>
+                    <h3>Biến thể khác (m7 / dim / add9)</h3>
                     <div class="chord-selection-grid" id="grid-ext"></div>
                 </div>
             </div>
@@ -392,19 +367,10 @@
         function checkOrientation() {
             const isPortrait = window.innerHeight > window.innerWidth;
             const overlay = document.getElementById('orientation-overlay');
-            // Hiện overlay khi ở dọc, ẩn khi ở ngang
-            overlay.style.display = isPortrait ? 'flex' : 'none';
-        }
-
-        async function toggleFullScreen() {
-            if (!document.fullscreenElement) {
-                try {
-                    await document.documentElement.requestFullscreen();
-                } catch (e) {}
+            if (isPortrait) {
+                overlay.style.display = 'flex';
             } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                }
+                overlay.style.display = 'none';
             }
         }
 
@@ -417,49 +383,33 @@
             try {
                 if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape');
             } catch (err) {}
-            
-            initAudio();
             checkOrientation();
+            initAudio();
         }
 
         function initAudio() {
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 
-                // Master compressor for dynamic control
+                // Master Limiter/Compressor to prevent clipping (rè)
                 masterCompressor = audioCtx.createDynamicsCompressor();
-                masterCompressor.threshold.setValueAtTime(-24, audioCtx.currentTime);
-                masterCompressor.knee.setValueAtTime(30, audioCtx.currentTime);
+                masterCompressor.threshold.setValueAtTime(-10, audioCtx.currentTime);
+                masterCompressor.knee.setValueAtTime(40, audioCtx.currentTime);
                 masterCompressor.ratio.setValueAtTime(12, audioCtx.currentTime);
-                masterCompressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+                masterCompressor.attack.setValueAtTime(0, audioCtx.currentTime);
                 masterCompressor.release.setValueAtTime(0.25, audioCtx.currentTime);
-                
+
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = 1.0;
-                
+                masterGain.gain.value = 0.8; // Giảm tổng âm lượng một chút để tránh rè
+
                 masterCompressor.connect(masterGain);
                 masterGain.connect(audioCtx.destination);
             }
             if (audioCtx.state === 'suspended') audioCtx.resume();
         }
 
-        // Resume audio context on any user interaction
-        function resumeAudioContext() {
-            if (!audioCtx) {
-                initAudio();
-            }
-            if (audioCtx && audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
-        }
-
         window.addEventListener('resize', checkOrientation);
         window.addEventListener('load', checkOrientation);
-
-        // Add event listeners for user interactions to resume audio
-        document.addEventListener('touchstart', resumeAudioContext, { once: true });
-        document.addEventListener('mousedown', resumeAudioContext, { once: true });
-        document.addEventListener('keydown', resumeAudioContext, { once: true });
 
         function init() {
             for (let gridId in GROUPS) {
@@ -491,10 +441,8 @@
         }
 
         document.getElementById('btn-play').onclick = () => {
-            if (myChords.length === 0) return alert("Chọn ít nhất 1 hợp âm!");
+            if (myChords.length === 0) return alert("Vui lòng chọn ít nhất 1 hợp âm!");
             activeChord = myChords[0];
-            
-            // Initialize audio context here too
             initAudio();
             
             const playGrid = document.getElementById('play-chord-grid');
@@ -515,288 +463,50 @@
             document.getElementById('app-container').style.opacity = '1';
         };
 
-function createPickNoise(t, duration = 0.012) {
-    const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * duration, audioCtx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < data.length; i++) {
-        // More complex noise with multiple components
-        const whiteNoise = (Math.random() * 2 - 1);
-        const pinkNoise = whiteNoise / Math.sqrt(i + 1);
-        const attack = Math.exp(-i / (data.length * 0.2)); // Slower attack
-        const decay = Math.exp(-i / (data.length * 0.8)); // Longer decay
-        data[i] = (whiteNoise * 0.3 + pinkNoise * 0.7) * attack * decay;
-    }
-    const src = audioCtx.createBufferSource();
-    src.buffer = buffer;
-    return src;
-}
-
-function createKarplusStrong(freq, decay = 0.996) {
-    const delayTime = 1 / freq;
-    const delay = audioCtx.createDelay(delayTime);
-    delay.delayTime.value = delayTime;
-    
-    const feedback = audioCtx.createGain();
-    feedback.gain.value = decay;
-    
-    // Multiple low-pass filters for string stiffness and dispersion
-    const damping1 = audioCtx.createBiquadFilter();
-    damping1.type = "lowpass";
-    damping1.frequency.value = freq * 6; // Higher cutoff for brightness
-    damping1.Q.value = 0.707;
-    
-    const damping2 = audioCtx.createBiquadFilter();
-    damping2.type = "lowpass";
-    damping2.frequency.value = freq * 3; // Medium damping
-    damping2.Q.value = 0.5;
-    
-    // Allpass filter for dispersion (wave propagation)
-    const dispersion = audioCtx.createBiquadFilter();
-    dispersion.type = "allpass";
-    dispersion.frequency.value = freq * 2;
-    dispersion.Q.value = 0.3;
-    
-    const output = audioCtx.createGain();
-    output.gain.value = 0.8;
-    
-    // Connect: delay -> dispersion -> damping1 -> damping2 -> feedback -> delay
-    delay.connect(dispersion);
-    dispersion.connect(damping1);
-    damping1.connect(damping2);
-    damping2.connect(feedback);
-    feedback.connect(delay);
-    
-    // Output taken from delay with some direct signal
-    delay.connect(output);
-    
-    const input = audioCtx.createGain();
-    input.connect(delay);
-    
-    return { input, output };
-}
-
-function createBodyResonance(input) {
-    // Multi-band body resonance for more realistic sound
-    const lowBand = audioCtx.createBiquadFilter();
-    lowBand.type = "lowshelf";
-    lowBand.frequency.value = 80;
-    lowBand.gain.value = instrument === 'electric' ? 2 : 6;
-    
-    const midBand = audioCtx.createBiquadFilter();
-    midBand.type = "peaking";
-    midBand.frequency.value = instrument === 'electric' ? 120 : 180;
-    midBand.Q.value = 0.8;
-    midBand.gain.value = 3;
-    
-    const highBand = audioCtx.createBiquadFilter();
-    highBand.type = "highshelf";
-    highBand.frequency.value = 2000;
-    highBand.gain.value = instrument === 'electric' ? -2 : 1;
-    
-    // Connect in series
-    input.connect(lowBand);
-    lowBand.connect(midBand);
-    midBand.connect(highBand);
-    
-    return highBand;
-}
-
-function createReverb(input) {
-    // Simple reverb for acoustic guitars
-    const convolver = audioCtx.createConvolver();
-    
-    // Create impulse response
-    const length = audioCtx.sampleRate * 2; // 2 seconds
-    const impulse = audioCtx.createBuffer(2, length, audioCtx.sampleRate);
-    
-    for (let channel = 0; channel < 2; channel++) {
-        const channelData = impulse.getChannelData(channel);
-        for (let i = 0; i < length; i++) {
-            // Exponential decay with some randomness
-            const decay = Math.exp(-i / (length * 0.3));
-            const noise = (Math.random() * 2 - 1) * 0.1;
-            channelData[i] = (Math.random() * 2 - 1) * decay + noise;
-        }
-    }
-    
-    convolver.buffer = impulse;
-    
-    // Mix dry and wet
-    const dry = audioCtx.createGain();
-    const wet = audioCtx.createGain();
-    dry.gain.value = 0.7;
-    wet.gain.value = 0.3;
-    
-    input.connect(dry);
-    input.connect(convolver);
-    convolver.connect(wet);
-    
-    const merger = audioCtx.createChannelMerger(2);
-    dry.connect(merger, 0, 0);
-    dry.connect(merger, 0, 1);
-    wet.connect(merger, 0, 0);
-    wet.connect(merger, 0, 1);
-    
-    return merger;
-}
-
-function createStereoChorus(input) {
-    // Create stereo output with subtle modulation
-    const splitter = audioCtx.createChannelSplitter(2);
-    const merger = audioCtx.createChannelMerger(2);
-    
-    // Convert mono to stereo if needed
-    const monoToStereo = audioCtx.createChannelMerger(2);
-    input.connect(monoToStereo, 0, 0);
-    input.connect(monoToStereo, 0, 1);
-    
-    // Left channel - subtle delay
-    const delayL = audioCtx.createDelay();
-    delayL.delayTime.value = 0.012;
-    
-    const lfoL = audioCtx.createOscillator();
-    const lfoGainL = audioCtx.createGain();
-    lfoL.frequency.value = 0.3; // Slower modulation
-    lfoGainL.gain.value = 0.002; // Very subtle
-    
-    lfoL.connect(lfoGainL);
-    lfoGainL.connect(delayL.delayTime);
-    lfoL.start();
-    
-    // Right channel - slightly different
-    const delayR = audioCtx.createDelay();
-    delayR.delayTime.value = 0.016;
-    
-    const lfoR = audioCtx.createOscillator();
-    const lfoGainR = audioCtx.createGain();
-    lfoR.frequency.value = 0.25; // Different speed
-    lfoGainR.gain.value = 0.002;
-    
-    lfoR.connect(lfoGainR);
-    lfoGainR.connect(delayR.delayTime);
-    lfoR.start();
-    
-    // Connect the chain with very light mixing
-    monoToStereo.connect(splitter);
-    splitter.connect(delayL, 0);
-    splitter.connect(delayR, 1);
-    
-    // Mix original and delayed signals (mostly dry)
-    const mixL = audioCtx.createGain();
-    mixL.gain.value = 0.85; // Mostly dry
-    const mixR = audioCtx.createGain();
-    mixR.gain.value = 0.85;
-    
-    const delayMixL = audioCtx.createGain();
-    delayMixL.gain.value = 0.15; // Very subtle delay
-    const delayMixR = audioCtx.createGain();
-    delayMixR.gain.value = 0.15;
-    
-    splitter.connect(mixL, 0);
-    splitter.connect(mixR, 1);
-    delayL.connect(delayMixL);
-    delayR.connect(delayMixR);
-    
-    mixL.connect(merger, 0, 0);
-    mixR.connect(merger, 0, 1);
-    delayMixL.connect(merger, 0, 0);
-    delayMixR.connect(merger, 0, 1);
-    
-    return merger;
-}
-
-function createLimiter(input) {
-    const limiter = audioCtx.createDynamicsCompressor();
-    limiter.threshold.setValueAtTime(-6, audioCtx.currentTime);
-    limiter.knee.setValueAtTime(0, audioCtx.currentTime);
-    limiter.ratio.setValueAtTime(20, audioCtx.currentTime);
-    limiter.attack.setValueAtTime(0.003, audioCtx.currentTime);
-    limiter.release.setValueAtTime(0.25, audioCtx.currentTime);
-    
-    input.connect(limiter);
-    return limiter;
-}
-
-
         function playString(idx) {
-            if (!activeChord) return;
-            
-            // Initialize audio context if not already done
-            if (!audioCtx) {
-                initAudio();
-            }
-            
-            // Resume audio context if suspended
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
-            
+            if (!audioCtx || !activeChord) return;
             const t = audioCtx.currentTime;
             const semitones = ALL_CHORDS[activeChord][idx];
-            if (semitones === null) return;
+            if (semitones === null) return; // Dây không bấm
 
             const freq = BASE_FREQS[idx] * Math.pow(2, semitones / 12);
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+
+            // Setup Filter (Loại bỏ tần số gây rè)
+            filter.type = "lowpass";
+            filter.frequency.setValueAtTime(instrument === 'electric' ? 2500 : 4000, t);
+            filter.Q.setValueAtTime(1, t);
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(masterCompressor);
+
+            osc.frequency.setValueAtTime(freq, t);
             
-            // Create Karplus-Strong string simulation with instrument-specific decay
-            let decayValue;
-            if (instrument === 'electric') {
-                decayValue = 0.9985; // Longer sustain for electric
+            if (instrument === 'acoustic') {
+                osc.type = 'triangle';
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(0.5, t + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 2.0);
             } else if (instrument === 'classic') {
-                decayValue = 0.993; // Faster decay for classical
+                osc.type = 'sine';
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(0.4, t + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 1.5);
             } else {
-                decayValue = 0.995; // Medium decay for acoustic
-            }
-            const ks = createKarplusStrong(freq, decayValue);
-            
-            // Create pick noise
-            const pickNoise = createPickNoise(t);
-            
-            // Advanced ADSR envelope for natural guitar decay
-            const adsr = audioCtx.createGain();
-            adsr.gain.setValueAtTime(0, t);
-            
-            // Attack stage - very fast
-            adsr.gain.linearRampToValueAtTime(1.2, t + 0.001);
-            
-            // Initial decay - quick drop
-            adsr.gain.exponentialRampToValueAtTime(0.8, t + 0.005);
-            
-            // Sustain build-up - slight increase
-            adsr.gain.linearRampToValueAtTime(0.9, t + 0.02);
-            
-            // Main decay - natural guitar decay
-            adsr.gain.exponentialRampToValueAtTime(0.3, t + 0.1);
-            
-            // Long release - very gradual
-            adsr.gain.exponentialRampToValueAtTime(0.001, t + (instrument === 'electric' ? 5.0 : 4.0));
-            
-            // Connect pick noise to Karplus-Strong input
-            pickNoise.connect(ks.input);
-            ks.output.connect(adsr);
-            
-            // Apply body resonance
-            const bodyRes = createBodyResonance(adsr);
-            
-            // Apply effects based on instrument
-            let finalOutput = bodyRes;
-            
-            if (instrument === 'electric') {
-                // Stereo chorus for electric guitar
-                finalOutput = createStereoChorus(bodyRes);
-            } else {
-                // Reverb for acoustic guitars
-                finalOutput = createReverb(bodyRes);
+                // Electric: Dùng hỗn hợp sóng để tạo tiếng dày nhưng filter kỹ
+                osc.type = 'sawtooth';
+                filter.frequency.exponentialRampToValueAtTime(800, t + 1.0);
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(0.3, t + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 3.0);
             }
             
-            // Apply limiter and compressor
-            const limiter = createLimiter(finalOutput);
-            
-            // Connect to master chain
-            limiter.connect(masterCompressor);
-            
-            // Start the pick noise
-            pickNoise.start(t);
-            pickNoise.stop(t + 0.01);
+            osc.start(t);
+            osc.stop(t + 3);
         }
 
         function trigger(container, idx) {
