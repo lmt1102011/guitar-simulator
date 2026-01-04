@@ -423,10 +423,8 @@
         }
 
         function initAudio() {
-            console.log('Initializing audio context...');
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                console.log('Audio context created, state:', audioCtx.state);
                 
                 // Master compressor for dynamic control
                 masterCompressor = audioCtx.createDynamicsCompressor();
@@ -441,13 +439,8 @@
                 
                 masterCompressor.connect(masterGain);
                 masterGain.connect(audioCtx.destination);
-                console.log('Audio chain connected');
             }
-            if (audioCtx.state === 'suspended') {
-                console.log('Resuming suspended audio context...');
-                audioCtx.resume();
-            }
-            console.log('Audio context state:', audioCtx.state);
+            if (audioCtx.state === 'suspended') audioCtx.resume();
         }
 
         // Resume audio context on any user interaction
@@ -522,11 +515,16 @@
             document.getElementById('app-container').style.opacity = '1';
         };
 
-function createPickNoise(t, duration = 0.008) {
+function createPickNoise(t, duration = 0.012) {
     const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * duration, audioCtx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < data.length; i++) {
-        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (data.length * 0.3));
+        // More complex noise with multiple components
+        const whiteNoise = (Math.random() * 2 - 1);
+        const pinkNoise = whiteNoise / Math.sqrt(i + 1);
+        const attack = Math.exp(-i / (data.length * 0.2)); // Slower attack
+        const decay = Math.exp(-i / (data.length * 0.8)); // Longer decay
+        data[i] = (whiteNoise * 0.3 + pinkNoise * 0.7) * attack * decay;
     }
     const src = audioCtx.createBufferSource();
     src.buffer = buffer;
@@ -541,16 +539,36 @@ function createKarplusStrong(freq, decay = 0.996) {
     const feedback = audioCtx.createGain();
     feedback.gain.value = decay;
     
-    // Simple feedback loop
-    delay.connect(feedback);
+    // Multiple low-pass filters for string stiffness and dispersion
+    const damping1 = audioCtx.createBiquadFilter();
+    damping1.type = "lowpass";
+    damping1.frequency.value = freq * 6; // Higher cutoff for brightness
+    damping1.Q.value = 0.707;
+    
+    const damping2 = audioCtx.createBiquadFilter();
+    damping2.type = "lowpass";
+    damping2.frequency.value = freq * 3; // Medium damping
+    damping2.Q.value = 0.5;
+    
+    // Allpass filter for dispersion (wave propagation)
+    const dispersion = audioCtx.createBiquadFilter();
+    dispersion.type = "allpass";
+    dispersion.frequency.value = freq * 2;
+    dispersion.Q.value = 0.3;
+    
+    const output = audioCtx.createGain();
+    output.gain.value = 0.8;
+    
+    // Connect: delay -> dispersion -> damping1 -> damping2 -> feedback -> delay
+    delay.connect(dispersion);
+    dispersion.connect(damping1);
+    damping1.connect(damping2);
+    damping2.connect(feedback);
     feedback.connect(delay);
     
-    // Output from delay
-    const output = audioCtx.createGain();
-    output.gain.value = 1.0;
+    // Output taken from delay with some direct signal
     delay.connect(output);
     
-    // Input for excitation
     const input = audioCtx.createGain();
     input.connect(delay);
     
@@ -558,23 +576,72 @@ function createKarplusStrong(freq, decay = 0.996) {
 }
 
 function createBodyResonance(input) {
-    const body = audioCtx.createBiquadFilter();
-    body.type = "bandpass";
-    body.frequency.value = instrument === 'electric' ? 120 : 180; // Lower frequency for electric
-    body.Q.value = 0.8;
+    // Multi-band body resonance for more realistic sound
+    const lowBand = audioCtx.createBiquadFilter();
+    lowBand.type = "lowshelf";
+    lowBand.frequency.value = 80;
+    lowBand.gain.value = instrument === 'electric' ? 2 : 6;
+    
+    const midBand = audioCtx.createBiquadFilter();
+    midBand.type = "peaking";
+    midBand.frequency.value = instrument === 'electric' ? 120 : 180;
+    midBand.Q.value = 0.8;
+    midBand.gain.value = 3;
+    
+    const highBand = audioCtx.createBiquadFilter();
+    highBand.type = "highshelf";
+    highBand.frequency.value = 2000;
+    highBand.gain.value = instrument === 'electric' ? -2 : 1;
+    
+    // Connect in series
+    input.connect(lowBand);
+    lowBand.connect(midBand);
+    midBand.connect(highBand);
+    
+    return highBand;
+}
 
-    const warmth = audioCtx.createBiquadFilter();
-    warmth.type = "lowshelf";
-    warmth.frequency.value = instrument === 'electric' ? 200 : 300; // Lower for electric
-    warmth.gain.value = instrument === 'electric' ? 2 : 4; // Less warmth for electric
-
-    input.connect(body);
-    body.connect(warmth);
-    return warmth;
+function createReverb(input) {
+    // Simple reverb for acoustic guitars
+    const convolver = audioCtx.createConvolver();
+    
+    // Create impulse response
+    const length = audioCtx.sampleRate * 2; // 2 seconds
+    const impulse = audioCtx.createBuffer(2, length, audioCtx.sampleRate);
+    
+    for (let channel = 0; channel < 2; channel++) {
+        const channelData = impulse.getChannelData(channel);
+        for (let i = 0; i < length; i++) {
+            // Exponential decay with some randomness
+            const decay = Math.exp(-i / (length * 0.3));
+            const noise = (Math.random() * 2 - 1) * 0.1;
+            channelData[i] = (Math.random() * 2 - 1) * decay + noise;
+        }
+    }
+    
+    convolver.buffer = impulse;
+    
+    // Mix dry and wet
+    const dry = audioCtx.createGain();
+    const wet = audioCtx.createGain();
+    dry.gain.value = 0.7;
+    wet.gain.value = 0.3;
+    
+    input.connect(dry);
+    input.connect(convolver);
+    convolver.connect(wet);
+    
+    const merger = audioCtx.createChannelMerger(2);
+    dry.connect(merger, 0, 0);
+    dry.connect(merger, 0, 1);
+    wet.connect(merger, 0, 0);
+    wet.connect(merger, 0, 1);
+    
+    return merger;
 }
 
 function createStereoChorus(input) {
-    // Create stereo output
+    // Create stereo output with subtle modulation
     const splitter = audioCtx.createChannelSplitter(2);
     const merger = audioCtx.createChannelMerger(2);
     
@@ -583,50 +650,57 @@ function createStereoChorus(input) {
     input.connect(monoToStereo, 0, 0);
     input.connect(monoToStereo, 0, 1);
     
-    // Left channel delay
+    // Left channel - subtle delay
     const delayL = audioCtx.createDelay();
-    delayL.delayTime.value = 0.018;
+    delayL.delayTime.value = 0.012;
     
     const lfoL = audioCtx.createOscillator();
     const lfoGainL = audioCtx.createGain();
-    lfoL.frequency.value = 0.8;
-    lfoGainL.gain.value = 0.004;
+    lfoL.frequency.value = 0.3; // Slower modulation
+    lfoGainL.gain.value = 0.002; // Very subtle
     
     lfoL.connect(lfoGainL);
     lfoGainL.connect(delayL.delayTime);
     lfoL.start();
     
-    // Right channel delay
+    // Right channel - slightly different
     const delayR = audioCtx.createDelay();
-    delayR.delayTime.value = 0.022;
+    delayR.delayTime.value = 0.016;
     
     const lfoR = audioCtx.createOscillator();
     const lfoGainR = audioCtx.createGain();
-    lfoR.frequency.value = 0.7;
-    lfoGainR.gain.value = 0.004;
+    lfoR.frequency.value = 0.25; // Different speed
+    lfoGainR.gain.value = 0.002;
     
     lfoR.connect(lfoGainR);
     lfoGainR.connect(delayR.delayTime);
     lfoR.start();
     
-    // Connect the chain
+    // Connect the chain with very light mixing
     monoToStereo.connect(splitter);
     splitter.connect(delayL, 0);
     splitter.connect(delayR, 1);
     
-    // Mix original and delayed signals
+    // Mix original and delayed signals (mostly dry)
     const mixL = audioCtx.createGain();
-    mixL.gain.value = 0.7;
+    mixL.gain.value = 0.85; // Mostly dry
     const mixR = audioCtx.createGain();
-    mixR.gain.value = 0.7;
+    mixR.gain.value = 0.85;
+    
+    const delayMixL = audioCtx.createGain();
+    delayMixL.gain.value = 0.15; // Very subtle delay
+    const delayMixR = audioCtx.createGain();
+    delayMixR.gain.value = 0.15;
     
     splitter.connect(mixL, 0);
     splitter.connect(mixR, 1);
-    delayL.connect(mixL);
-    delayR.connect(mixR);
+    delayL.connect(delayMixL);
+    delayR.connect(delayMixR);
     
     mixL.connect(merger, 0, 0);
     mixR.connect(merger, 0, 1);
+    delayMixL.connect(merger, 0, 0);
+    delayMixR.connect(merger, 0, 1);
     
     return merger;
 }
@@ -645,7 +719,6 @@ function createLimiter(input) {
 
 
         function playString(idx) {
-            console.log('Playing string', idx, 'chord:', activeChord);
             if (!activeChord) return;
             
             // Initialize audio context if not already done
@@ -664,19 +737,38 @@ function createLimiter(input) {
 
             const freq = BASE_FREQS[idx] * Math.pow(2, semitones / 12);
             
-            // Create Karplus-Strong string simulation
-            const decayValue = instrument === 'electric' ? 0.998 : (instrument === 'classic' ? 0.994 : 0.996);
+            // Create Karplus-Strong string simulation with instrument-specific decay
+            let decayValue;
+            if (instrument === 'electric') {
+                decayValue = 0.9985; // Longer sustain for electric
+            } else if (instrument === 'classic') {
+                decayValue = 0.993; // Faster decay for classical
+            } else {
+                decayValue = 0.995; // Medium decay for acoustic
+            }
             const ks = createKarplusStrong(freq, decayValue);
             
             // Create pick noise
             const pickNoise = createPickNoise(t);
             
-            // ADSR envelope for natural decay
+            // Advanced ADSR envelope for natural guitar decay
             const adsr = audioCtx.createGain();
             adsr.gain.setValueAtTime(0, t);
-            adsr.gain.linearRampToValueAtTime(1.0, t + 0.002); // Faster attack
-            adsr.gain.exponentialRampToValueAtTime(0.6, t + 0.01); // Quick decay to sustain
-            adsr.gain.exponentialRampToValueAtTime(0.001, t + (instrument === 'electric' ? 4.0 : 3.0)); // Longer release
+            
+            // Attack stage - very fast
+            adsr.gain.linearRampToValueAtTime(1.2, t + 0.001);
+            
+            // Initial decay - quick drop
+            adsr.gain.exponentialRampToValueAtTime(0.8, t + 0.005);
+            
+            // Sustain build-up - slight increase
+            adsr.gain.linearRampToValueAtTime(0.9, t + 0.02);
+            
+            // Main decay - natural guitar decay
+            adsr.gain.exponentialRampToValueAtTime(0.3, t + 0.1);
+            
+            // Long release - very gradual
+            adsr.gain.exponentialRampToValueAtTime(0.001, t + (instrument === 'electric' ? 5.0 : 4.0));
             
             // Connect pick noise to Karplus-Strong input
             pickNoise.connect(ks.input);
@@ -692,11 +784,8 @@ function createLimiter(input) {
                 // Stereo chorus for electric guitar
                 finalOutput = createStereoChorus(bodyRes);
             } else {
-                // Light chorus for acoustic/classic
-                const chorus = audioCtx.createDelay();
-                chorus.delayTime.value = 0.015;
-                bodyRes.connect(chorus);
-                finalOutput = chorus;
+                // Reverb for acoustic guitars
+                finalOutput = createReverb(bodyRes);
             }
             
             // Apply limiter and compressor
