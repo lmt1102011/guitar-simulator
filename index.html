@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Guitar Simulator Pro Max - High Quality Audio</title>
+    <style>
+        :root {
+            --bg-color: #0a0a0a;
+            --panel-color: #1a1a1a;
+            --accent-color: #f39c12;
+            --active-chord: #27ae60;
+            --text-color: #ecf0f1;
+            --wood-pattern: url('https://www.transparenttextures.com/patterns/wood-pattern.png');
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        /* --- NÚT FULLSCREEN NHANH --- */
+        #fs-toggle {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 6000;
+            background: rgba(0,0,0,0.6);
+            border: 1px solid var(--accent-color);
+            color: var(--accent-color);
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* --- LỚP PHỦ CẢNH BÁO --- */
+        #orientation-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+        }
+
+        #orientation-overlay h2 { color: var(--accent-color); margin-bottom: 10px; }
+        #orientation-overlay p { margin-bottom: 25px; color: #ccc; }
+
+        .btn-fullscreen {
+            padding: 15px 30px;
+            background: var(--accent-color);
+            border: none;
+            border-radius: 50px;
+            color: black;
+            font-weight: bold;
+            font-size: 1.1rem;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(243, 156, 18, 0.4);
+        }
+
+        /* --- SETUP SCREEN --- */
+        #setup-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #121212;
+            z-index: 5000;
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .setup-column {
+            background: #222;
+            border-radius: 20px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid #333;
+        }
+
+        .instr-col { flex: 0.8; }
+        .chord-col { flex: 3; overflow: hidden; }
+
+        h2 {
+            color: var(--accent-color);
+            font-size: 1.2rem;
+            margin: 0 0 15px 0;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .instr-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* QUAN TRỌNG: Cho phép cuộn bằng touch ở vùng này */
+        .chord-scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 10px;
+            touch-action: pan-y; /* Cho phép cuộn dọc trên đth */
+        }
+
+        .chord-group {
+            margin-bottom: 25px;
+        }
+
+        .chord-group h3 {
+            font-size: 0.85rem;
+            color: #aaa;
+            margin-bottom: 12px;
+            border-left: 3px solid var(--accent-color);
+            padding-left: 10px;
+            text-transform: uppercase;
+        }
+
+        .chord-selection-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+            gap: 8px;
+        }
+
+        .selectable {
+            padding: 10px 2px;
+            background: #2c2c2c;
+            border: 1px solid #444;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .selectable.selected {
+            border-color: var(--accent-color);
+            background: var(--accent-color);
+            color: #000;
+            box-shadow: 0 0 12px rgba(243, 156, 18, 0.4);
+        }
+
+        #btn-play {
+            margin-top: 20px;
+            padding: 15px;
+            background: linear-gradient(to right, #f39c12, #e67e22);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* --- PLAY SCREEN --- */
+        #app-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 0.8s ease;
+        }
+
+        #strum-area {
+            flex: 1.5;
+            position: relative;
+            background-color: #3d2218;
+            background-image: var(--wood-pattern);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-evenly;
+            overflow: hidden;
+            box-shadow: inset -20px 0 60px rgba(0,0,0,0.7);
+            touch-action: none; /* Vùng gảy đàn thì không cho cuộn trang */
+        }
+
+        #sound-hole-container {
+            position: absolute;
+            top: 50%;
+            left: -18vh;
+            transform: translateY(-50%);
+            width: 90vh;
+            height: 90vh;
+            border-radius: 50%;
+            background: #000;
+            border: 18px solid #2d1b14;
+            box-shadow: 
+                inset 0 0 80px #000,
+                0 0 0 6px #5d4037,
+                0 0 30px rgba(0,0,0,0.9);
+            z-index: 1;
+        }
+
+        #controls-panel {
+            flex: 0.6;
+            background: var(--panel-color);
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            border-left: 4px solid #000;
+            z-index: 10;
+        }
+
+        .chord-active-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            overflow-y: auto;
+            touch-action: pan-y; /* Cho phép cuộn danh sách hợp âm khi đang chơi */
+        }
+
+        .btn-chord {
+            padding: 20px 5px;
+            background: #252525;
+            border: 2px solid #333;
+            color: #777;
+            border-radius: 12px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .btn-chord.active {
+            background: var(--active-chord);
+            color: #fff;
+            border-color: #fff;
+            box-shadow: 0 0 15px rgba(39, 174, 96, 0.4);
+            transform: scale(1.05);
+        }
+
+        .string-container {
+            position: relative;
+            width: 100%;
+            height: 12%;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+        }
+
+        .string {
+            width: 100%;
+            background: linear-gradient(to bottom, #888, #eee 40%, #fff 50%, #eee 60%, #888);
+            box-shadow: 0 3px 5px rgba(0,0,0,0.6);
+            pointer-events: none;
+        }
+
+        .string[data-index="5"] { height: 6px; } 
+        .string[data-index="4"] { height: 5px; }
+        .string[data-index="3"] { height: 4px; }
+        .string[data-index="2"] { height: 2.8px; }
+        .string[data-index="1"] { height: 2px; }
+        .string[data-index="0"] { height: 1.4px; }
+
+        @keyframes vibrate {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(2px); }
+        }
+        .vibrating { animation: vibrate 0.07s infinite; }
+
+        .string-highlight {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.25);
+            opacity: 0; pointer-events: none;
+        }
+        .string-highlight.active { opacity: 1; }
+
+        .btn-reset {
+            background: #c0392b;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <button id="fs-toggle" onclick="toggleFullScreen()">
+        <span id="fs-icon">⛶</span> Toàn màn hình
+    </button>
+
+    <div id="orientation-overlay">
+        <h2>🎸 Chào mừng bạn!</h2>
+        <p>Để có trải nghiệm âm thanh tốt nhất và không bị rè, hãy xoay ngang điện thoại và bật toàn màn hình.</p>
+        <button class="btn-fullscreen" onclick="requestFullScreenAndLandscape()">VÀO CHƠI NGAY</button>
+    </div>
+
+    <div id="setup-screen">
+        <div class="setup-column instr-col">
+            <h2>Loại Đàn</h2>
+            <div class="instr-list">
+                <div class="selectable instr-opt selected" data-val="acoustic">Acoustic</div>
+                <div class="selectable instr-opt" data-val="classic">Classic</div>
+                <div class="selectable instr-opt" data-val="electric">Electric</div>
+            </div>
+            <button id="btn-play">CHƠI</button>
+        </div>
+        
+        <div class="setup-column chord-col">
+            <h2>Chọn Hợp Âm</h2>
+            <div class="chord-scroll-area">
+                <div class="chord-group">
+                    <h3>Trưởng & Thứ</h3>
+                    <div class="chord-selection-grid" id="grid-main"></div>
+                </div>
+                <div class="chord-group">
+                    <h3>Hợp âm 7</h3>
+                    <div class="chord-selection-grid" id="grid-7th"></div>
+                </div>
+                <div class="chord-group">
+                    <h3>Treo (sus)</h3>
+                    <div class="chord-selection-grid" id="grid-sus"></div>
+                </div>
+                <div class="chord-group">
+                    <h3>Mở rộng</h3>
+                    <div class="chord-selection-grid" id="grid-ext"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-container">
+        <div id="strum-area">
+            <div id="sound-hole-container"></div>
+            <div class="string-container" data-string="5"><div class="string-highlight"></div><div class="string" data-index="5"></div></div>
+            <div class="string-container" data-string="4"><div class="string-highlight"></div><div class="string" data-index="4"></div></div>
+            <div class="string-container" data-string="3"><div class="string-highlight"></div><div class="string" data-index="3"></div></div>
+            <div class="string-container" data-string="2"><div class="string-highlight"></div><div class="string" data-index="2"></div></div>
+            <div class="string-container" data-string="1"><div class="string-highlight"></div><div class="string" data-index="1"></div></div>
+            <div class="string-container" data-string="0"><div class="string-highlight"></div><div class="string" data-index="0"></div></div>
+        </div>
+
+        <div id="controls-panel">
+            <button class="btn-reset" onclick="location.reload()">← Quay lại</button>
+            <div class="chord-active-list" id="play-chord-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        const ALL_CHORDS = {
+            'C': [0,1,0,2,3,0], 'Cm': [3,4,5,5,3,3], 'D': [2,3,2,0,0,2], 'Dm': [1,3,2,0,0,1],
+            'E': [0,0,1,2,2,0], 'Em': [0,0,0,2,2,0], 'F': [1,1,2,3,3,1], 'Fm': [1,1,1,3,3,1],
+            'G': [3,0,0,0,2,3], 'Gm': [3,3,3,5,5,3], 'A': [0,2,2,2,0,0], 'Am': [0,1,2,2,0,0],
+            'B': [2,4,4,4,2,2], 'Bm': [2,3,4,4,2,2],
+            'C7': [0,1,3,2,3,0], 'CMaj7': [0,0,0,2,3,null], 'D7': [2,1,2,0,0,2], 'E7': [0,3,1,2,2,0],
+            'G7': [1,0,0,0,2,3], 'A7': [0,2,0,2,0,0], 'B7': [2,0,2,1,2,2], 'AMaj7': [0,2,1,2,0,0],
+            'Csus4': [null,1,0,3,3,null], 'Dsus2': [0,3,2,0,0,null], 'Dsus4': [3,3,2,0,0,null],
+            'Esus4': [0,0,2,2,2,0], 'Asus2': [0,0,2,2,0,0], 'Asus4': [0,3,2,2,0,0], 'Gsus4': [3,1,0,0,2,3],
+            'Am7': [0,1,0,2,0,0], 'Dm7': [1,1,2,0,0,null], 'Em7': [0,3,0,2,2,0], 'Cadd9': [0,3,0,2,3,null],
+            'Dadd9': [0,3,2,4,5,null], 'Fdim': [1,0,1,0,null,null], 'Gdim': [3,2,3,2,null,null]
+        };
+
+        const GROUPS = {
+            'grid-main': ['C','Cm','D','Dm','E','Em','F','Fm','G','Gm','A','Am','B','Bm'],
+            'grid-7th': ['C7','CMaj7','D7','E7','G7','A7','B7','AMaj7'],
+            'grid-sus': ['Csus4','Dsus2','Dsus4','Esus4','Asus2','Asus4','Gsus4'],
+            'grid-ext': ['Am7','Dm7','Em7','Cadd9','Dadd9','Fdim','Gdim']
+        };
+
+        const BASE_FREQS = [329.63, 246.94, 196.00, 146.83, 110.00, 82.41]; 
+        let audioCtx = null;
+        let masterGain = null;
+        let masterCompressor = null;
+        let instrument = 'acoustic';
+        let myChords = [];
+        let activeChord = '';
+
+        function checkOrientation() {
+            const isPortrait = window.innerHeight > window.innerWidth;
+            const overlay = document.getElementById('orientation-overlay');
+            // Hiện overlay khi ở dọc, ẩn khi ở ngang
+            overlay.style.display = isPortrait ? 'flex' : 'none';
+        }
+
+        async function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                try {
+                    await document.documentElement.requestFullscreen();
+                } catch (e) {}
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        async function requestFullScreenAndLandscape() {
+            const docEl = document.documentElement;
+            try {
+                if (docEl.requestFullscreen) await docEl.requestFullscreen();
+                else if (docEl.webkitRequestFullscreen) await docEl.webkitRequestFullscreen();
+            } catch (err) {}
+            try {
+                if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape');
+            } catch (err) {}
+            
+            initAudio();
+            checkOrientation();
+        }
+
+        function initAudio() {
+            console.log('Initializing audio context...');
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                console.log('Audio context created, state:', audioCtx.state);
+                
+                // Master compressor for dynamic control
+                masterCompressor = audioCtx.createDynamicsCompressor();
+                masterCompressor.threshold.setValueAtTime(-24, audioCtx.currentTime);
+                masterCompressor.knee.setValueAtTime(30, audioCtx.currentTime);
+                masterCompressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+                masterCompressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+                masterCompressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+                
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 1.0;
+                
+                masterCompressor.connect(masterGain);
+                masterGain.connect(audioCtx.destination);
+                console.log('Audio chain connected');
+            }
+            if (audioCtx.state === 'suspended') {
+                console.log('Resuming suspended audio context...');
+                audioCtx.resume();
+            }
+            console.log('Audio context state:', audioCtx.state);
+        }
+
+        // Resume audio context on any user interaction
+        function resumeAudioContext() {
+            if (!audioCtx) {
+                initAudio();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        window.addEventListener('resize', checkOrientation);
+        window.addEventListener('load', checkOrientation);
+
+        // Add event listeners for user interactions to resume audio
+        document.addEventListener('touchstart', resumeAudioContext, { once: true });
+        document.addEventListener('mousedown', resumeAudioContext, { once: true });
+        document.addEventListener('keydown', resumeAudioContext, { once: true });
+
+        function init() {
+            for (let gridId in GROUPS) {
+                const grid = document.getElementById(gridId);
+                GROUPS[gridId].forEach(chord => {
+                    const el = document.createElement('div');
+                    el.className = `selectable ${myChords.includes(chord) ? 'selected' : ''}`;
+                    el.textContent = chord;
+                    el.onclick = () => {
+                        if (myChords.includes(chord)) {
+                            myChords = myChords.filter(c => c !== chord);
+                            el.classList.remove('selected');
+                        } else {
+                            myChords.push(chord);
+                            el.classList.add('selected');
+                        }
+                    };
+                    grid.appendChild(el);
+                });
+            }
+
+            document.querySelectorAll('.instr-opt').forEach(opt => {
+                opt.onclick = () => {
+                    document.querySelectorAll('.instr-opt').forEach(o => o.classList.remove('selected'));
+                    opt.classList.add('selected');
+                    instrument = opt.dataset.val;
+                };
+            });
+        }
+
+        document.getElementById('btn-play').onclick = () => {
+            if (myChords.length === 0) return alert("Chọn ít nhất 1 hợp âm!");
+            activeChord = myChords[0];
+            
+            // Initialize audio context here too
+            initAudio();
+            
+            const playGrid = document.getElementById('play-chord-grid');
+            playGrid.innerHTML = '';
+            myChords.forEach(chord => {
+                const btn = document.createElement('div');
+                btn.className = `btn-chord ${chord === activeChord ? 'active' : ''}`;
+                btn.textContent = chord;
+                btn.onclick = () => {
+                    activeChord = chord;
+                    document.querySelectorAll('.btn-chord').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                };
+                playGrid.appendChild(btn);
+            });
+
+            document.getElementById('setup-screen').style.display = 'none';
+            document.getElementById('app-container').style.opacity = '1';
+        };
+
+function createPickNoise(t, duration = 0.008) {
+    const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * duration, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (data.length * 0.3));
+    }
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    return src;
+}
+
+function createKarplusStrong(freq, decay = 0.996) {
+    const delayTime = 1 / freq;
+    const delay = audioCtx.createDelay(delayTime);
+    delay.delayTime.value = delayTime;
+    
+    const feedback = audioCtx.createGain();
+    feedback.gain.value = decay;
+    
+    // Simple feedback loop
+    delay.connect(feedback);
+    feedback.connect(delay);
+    
+    // Output from delay
+    const output = audioCtx.createGain();
+    output.gain.value = 1.0;
+    delay.connect(output);
+    
+    // Input for excitation
+    const input = audioCtx.createGain();
+    input.connect(delay);
+    
+    return { input, output };
+}
+
+function createBodyResonance(input) {
+    const body = audioCtx.createBiquadFilter();
+    body.type = "bandpass";
+    body.frequency.value = instrument === 'electric' ? 120 : 180; // Lower frequency for electric
+    body.Q.value = 0.8;
+
+    const warmth = audioCtx.createBiquadFilter();
+    warmth.type = "lowshelf";
+    warmth.frequency.value = instrument === 'electric' ? 200 : 300; // Lower for electric
+    warmth.gain.value = instrument === 'electric' ? 2 : 4; // Less warmth for electric
+
+    input.connect(body);
+    body.connect(warmth);
+    return warmth;
+}
+
+function createStereoChorus(input) {
+    // Create stereo output
+    const splitter = audioCtx.createChannelSplitter(2);
+    const merger = audioCtx.createChannelMerger(2);
+    
+    // Convert mono to stereo if needed
+    const monoToStereo = audioCtx.createChannelMerger(2);
+    input.connect(monoToStereo, 0, 0);
+    input.connect(monoToStereo, 0, 1);
+    
+    // Left channel delay
+    const delayL = audioCtx.createDelay();
+    delayL.delayTime.value = 0.018;
+    
+    const lfoL = audioCtx.createOscillator();
+    const lfoGainL = audioCtx.createGain();
+    lfoL.frequency.value = 0.8;
+    lfoGainL.gain.value = 0.004;
+    
+    lfoL.connect(lfoGainL);
+    lfoGainL.connect(delayL.delayTime);
+    lfoL.start();
+    
+    // Right channel delay
+    const delayR = audioCtx.createDelay();
+    delayR.delayTime.value = 0.022;
+    
+    const lfoR = audioCtx.createOscillator();
+    const lfoGainR = audioCtx.createGain();
+    lfoR.frequency.value = 0.7;
+    lfoGainR.gain.value = 0.004;
+    
+    lfoR.connect(lfoGainR);
+    lfoGainR.connect(delayR.delayTime);
+    lfoR.start();
+    
+    // Connect the chain
+    monoToStereo.connect(splitter);
+    splitter.connect(delayL, 0);
+    splitter.connect(delayR, 1);
+    
+    // Mix original and delayed signals
+    const mixL = audioCtx.createGain();
+    mixL.gain.value = 0.7;
+    const mixR = audioCtx.createGain();
+    mixR.gain.value = 0.7;
+    
+    splitter.connect(mixL, 0);
+    splitter.connect(mixR, 1);
+    delayL.connect(mixL);
+    delayR.connect(mixR);
+    
+    mixL.connect(merger, 0, 0);
+    mixR.connect(merger, 0, 1);
+    
+    return merger;
+}
+
+function createLimiter(input) {
+    const limiter = audioCtx.createDynamicsCompressor();
+    limiter.threshold.setValueAtTime(-6, audioCtx.currentTime);
+    limiter.knee.setValueAtTime(0, audioCtx.currentTime);
+    limiter.ratio.setValueAtTime(20, audioCtx.currentTime);
+    limiter.attack.setValueAtTime(0.003, audioCtx.currentTime);
+    limiter.release.setValueAtTime(0.25, audioCtx.currentTime);
+    
+    input.connect(limiter);
+    return limiter;
+}
+
+
+        function playString(idx) {
+            console.log('Playing string', idx, 'chord:', activeChord);
+            if (!activeChord) return;
+            
+            // Initialize audio context if not already done
+            if (!audioCtx) {
+                initAudio();
+            }
+            
+            // Resume audio context if suspended
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            
+            const t = audioCtx.currentTime;
+            const semitones = ALL_CHORDS[activeChord][idx];
+            if (semitones === null) return;
+
+            const freq = BASE_FREQS[idx] * Math.pow(2, semitones / 12);
+            
+            // Create Karplus-Strong string simulation
+            const decayValue = instrument === 'electric' ? 0.998 : (instrument === 'classic' ? 0.994 : 0.996);
+            const ks = createKarplusStrong(freq, decayValue);
+            
+            // Create pick noise
+            const pickNoise = createPickNoise(t);
+            
+            // ADSR envelope for natural decay
+            const adsr = audioCtx.createGain();
+            adsr.gain.setValueAtTime(0, t);
+            adsr.gain.linearRampToValueAtTime(1.0, t + 0.002); // Faster attack
+            adsr.gain.exponentialRampToValueAtTime(0.6, t + 0.01); // Quick decay to sustain
+            adsr.gain.exponentialRampToValueAtTime(0.001, t + (instrument === 'electric' ? 4.0 : 3.0)); // Longer release
+            
+            // Connect pick noise to Karplus-Strong input
+            pickNoise.connect(ks.input);
+            ks.output.connect(adsr);
+            
+            // Apply body resonance
+            const bodyRes = createBodyResonance(adsr);
+            
+            // Apply effects based on instrument
+            let finalOutput = bodyRes;
+            
+            if (instrument === 'electric') {
+                // Stereo chorus for electric guitar
+                finalOutput = createStereoChorus(bodyRes);
+            } else {
+                // Light chorus for acoustic/classic
+                const chorus = audioCtx.createDelay();
+                chorus.delayTime.value = 0.015;
+                bodyRes.connect(chorus);
+                finalOutput = chorus;
+            }
+            
+            // Apply limiter and compressor
+            const limiter = createLimiter(finalOutput);
+            
+            // Connect to master chain
+            limiter.connect(masterCompressor);
+            
+            // Start the pick noise
+            pickNoise.start(t);
+            pickNoise.stop(t + 0.01);
+        }
+
+        function trigger(container, idx) {
+            const str = container.querySelector('.string');
+            str.classList.remove('vibrating');
+            void str.offsetWidth;
+            str.classList.add('vibrating');
+            setTimeout(() => str.classList.remove('vibrating'), 800);
+            container.querySelector('.string-highlight').classList.add('active');
+            setTimeout(() => container.querySelector('.string-highlight').classList.remove('active'), 200);
+            playString(parseInt(idx));
+        }
+
+        const area = document.getElementById('strum-area');
+        let lastId = null;
+        const handleMove = (e) => {
+            const touch = e.touches ? e.touches[0] : e;
+            const el = document.elementFromPoint(touch.clientX, touch.clientY);
+            const container = el?.closest('.string-container');
+            if (container) {
+                const id = container.dataset.string;
+                if (id !== lastId) { trigger(container, id); lastId = id; }
+            } else { lastId = null; }
+        };
+
+        area.onmousedown = (e) => { area.onmousemove = handleMove; handleMove(e); };
+        window.onmouseup = () => area.onmousemove = null;
+        area.ontouchstart = (e) => handleMove(e);
+        area.ontouchmove = (e) => { e.preventDefault(); handleMove(e); };
+        area.ontouchend = () => lastId = null;
+
+        init();
+    </script>
+</body>
+</html>
