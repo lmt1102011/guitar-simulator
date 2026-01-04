@@ -366,19 +366,28 @@
             'E': [0,0,1,2,2,0], 'Em': [0,0,0,2,2,0], 'F': [1,1,2,3,3,1], 'Fm': [1,1,1,3,3,1],
             'G': [3,0,0,0,2,3], 'Gm': [3,3,3,5,5,3], 'A': [0,2,2,2,0,0], 'Am': [0,1,2,2,0,0],
             'B': [2,4,4,4,2,2], 'Bm': [2,3,4,4,2,2],
-            'C7': [0,1,3,2,3,0], 'CMaj7': [0,0,0,2,3,null], 'D7': [2,1,2,0,0,2], 'E7': [0,3,1,2,2,0],
-            'G7': [1,0,0,0,2,3], 'A7': [0,2,0,2,0,0], 'B7': [2,0,2,1,2,2], 'AMaj7': [0,2,1,2,0,0],
-            'Csus4': [null,1,0,3,3,null], 'Dsus2': [0,3,2,0,0,null], 'Dsus4': [3,3,2,0,0,null],
-            'Esus4': [0,0,2,2,2,0], 'Asus2': [0,0,2,2,0,0], 'Asus4': [0,3,2,2,0,0], 'Gsus4': [3,1,0,0,2,3],
-            'Am7': [0,1,0,2,0,0], 'Dm7': [1,1,2,0,0,null], 'Em7': [0,3,0,2,2,0], 'Cadd9': [0,3,0,2,3,null],
-            'Dadd9': [0,3,2,4,5,null], 'Fdim': [1,0,1,0,null,null], 'Gdim': [3,2,3,2,null,null]
+            'C7': [0,1,3,2,3,0], 'CMaj7': [0,0,0,2,3,null], 'D7': [2,1,2,0,0,2], 'DMaj7': [2,2,1,2,0,null],
+            'E7': [0,3,1,2,2,0], 'EMaj7': [0,2,1,2,0,null], 'F7': [1,1,0,2,1,1], 'FMaj7': [1,0,2,2,1,null],
+            'G7': [1,0,0,0,2,3], 'GMaj7': [3,2,0,0,2,null], 'A7': [0,2,0,2,0,0], 'AMaj7': [0,2,1,2,0,0],
+            'B7': [2,0,2,1,2,2], 'BMaj7': [2,4,3,4,2,null],
+            'Csus4': [null,1,0,3,3,null], 'Csus2': [null,1,0,0,3,null], 'Dsus2': [0,3,2,0,0,null], 'Dsus4': [3,3,2,0,0,null],
+            'Esus4': [0,0,2,2,2,0], 'Esus2': [null,0,2,2,0,null], 'Fsus4': [1,1,3,3,3,1], 'Fsus2': [null,1,3,3,1,null],
+            'Gsus4': [3,1,0,0,2,3], 'Gsus2': [null,0,0,0,2,null], 'Asus2': [0,0,2,2,0,0], 'Asus4': [0,3,2,2,0,0],
+            'Bsus4': [null,2,4,4,2,null], 'Bsus2': [null,2,4,4,2,null],
+            'Am7': [0,1,0,2,0,0], 'Dm7': [1,1,2,0,0,null], 'Em7': [0,3,0,2,2,0], 'Gm7': [3,3,0,0,2,1],
+            'Cm7': [3,4,3,5,3,null], 'Fm7': [1,1,0,2,1,1], 'Bm7': [2,3,2,4,2,2],
+            'Cadd9': [0,3,0,2,3,null], 'Dadd9': [0,3,2,4,5,null], 'Eadd9': [0,2,1,1,0,null], 'Fadd9': [1,3,1,2,1,null],
+            'Gadd9': [3,0,2,0,0,null], 'Aadd9': [0,2,4,2,0,null], 'Badd9': [2,1,2,1,2,null],
+            'Fdim': [1,0,1,0,null,null], 'Gdim': [3,2,3,2,null,null], 'Adim': [0,1,2,1,null,null], 'Bdim': [2,3,4,3,null,null],
+            'C6': [0,0,2,2,3,null], 'D6': [0,2,0,2,0,null], 'E6': [0,2,1,2,0,null], 'F6': [1,0,0,2,1,null],
+            'G6': [3,0,0,0,0,null], 'A6': [0,2,2,2,2,null], 'B6': [2,1,2,1,0,null]
         };
 
         const GROUPS = {
             'grid-main': ['C','Cm','D','Dm','E','Em','F','Fm','G','Gm','A','Am','B','Bm'],
-            'grid-7th': ['C7','CMaj7','D7','E7','G7','A7','B7','AMaj7'],
-            'grid-sus': ['Csus4','Dsus2','Dsus4','Esus4','Asus2','Asus4','Gsus4'],
-            'grid-ext': ['Am7','Dm7','Em7','Cadd9','Dadd9','Fdim','Gdim']
+            'grid-7th': ['C7','CMaj7','D7','DMaj7','E7','EMaj7','F7','FMaj7','G7','GMaj7','A7','AMaj7','B7','BMaj7'],
+            'grid-sus': ['Csus4','Csus2','Dsus2','Dsus4','Esus4','Esus2','Fsus4','Fsus2','Gsus4','Gsus2','Asus2','Asus4','Bsus4','Bsus2'],
+            'grid-ext': ['Am7','Dm7','Em7','Gm7','Cm7','Fm7','Bm7','Cadd9','Dadd9','Eadd9','Fadd9','Gadd9','Aadd9','Badd9','Fdim','Gdim','Adim','Bdim','C6','D6','E6','F6','G6','A6','B6']
         };
 
         const BASE_FREQS = [329.63, 246.94, 196.00, 146.83, 110.00, 82.41]; 
@@ -426,10 +435,13 @@
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 masterCompressor = audioCtx.createDynamicsCompressor();
-                masterCompressor.threshold.setValueAtTime(-10, audioCtx.currentTime);
-                masterCompressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+                masterCompressor.threshold.setValueAtTime(-6, audioCtx.currentTime); // Higher threshold to avoid compression
+                masterCompressor.knee.setValueAtTime(30, audioCtx.currentTime); // Softer knee
+                masterCompressor.ratio.setValueAtTime(8, audioCtx.currentTime); // Less aggressive compression
+                masterCompressor.attack.setValueAtTime(0.003, audioCtx.currentTime); // Faster attack
+                masterCompressor.release.setValueAtTime(0.25, audioCtx.currentTime); // Medium release
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = 0.8;
+                masterGain.gain.value = 1.4; // Increased volume for louder sound
                 masterCompressor.connect(masterGain);
                 masterGain.connect(audioCtx.destination);
             }
